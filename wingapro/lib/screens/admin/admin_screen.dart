@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/bundle_provider.dart';
+import '../../providers/bundle_provider.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});

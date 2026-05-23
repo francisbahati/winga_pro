@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'login_screen.dart' show ApiConfig;
+import 'package:wingapro/services/api_config.dart'; // ✅ shared ApiConfig, no ambiguity
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});

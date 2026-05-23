@@ -1,17 +1,15 @@
+// lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/custom_button.dart';
-import 'dashboard_screen.dart';
+import 'buyer/dashboard_screen.dart';
+import 'seller/seller_dashboard_screen.dart';
+import 'admin/admin_dashboard_screen.dart';
 import 'register_screen.dart';
+import 'package:wingapro/services/api_config.dart';
 
-// ---------- API Configuration ----------
-class ApiConfig {
-  static const String baseUrl = 'http://192.168.1.18:5000'; // change to your PC's IP
-}
-
-// ---------- Authentication Service ----------
 class AuthService {
   Future<Map<String, dynamic>> login(String username, String password) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/api/login');
@@ -30,7 +28,6 @@ class AuthService {
   }
 }
 
-// ---------- Login Screen ----------
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -45,15 +42,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final AuthService _auth = AuthService();
   bool _isLoading = false;
-  int _failedAttempts = 0;
 
   void _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
-
-    if (_failedAttempts >= 3) {
-      _showError('Too many failed attempts. Account temporarily locked.');
-      return;
-    }
 
     setState(() => _isLoading = true);
 
@@ -64,23 +55,33 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (responseData['success'] == true) {
-        _failedAttempts = 0;
-        // Save token with SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', responseData['token']);
-        // Navigate to Dashboard
+        await prefs.setString('user_role', responseData['user']['role']);
+
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const DashboardScreen()),
-          );
+          final role = responseData['user']['role'];
+          if (role == 'admin') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+            );
+          } else if (role == 'seller') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const SellerDashboardScreen()),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const DashboardScreen()),
+            );
+          }
         }
       } else {
-        _failedAttempts++;
         _showError(responseData['message'] ?? 'Invalid credentials');
       }
     } catch (e) {
-      _failedAttempts++;
       _showError(e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -92,9 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Password Reset'),
-        content: const Text(
-          'Password recovery will be available in the full version.\nStay tuned.',
-        ),
+        content: const Text('Password recovery will be available in the full version.\nStay tuned.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -227,12 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           child: const Text('Create New Account'),
                         ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Login: Please do not attempt to login with invalid credentials more than 3 times.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
+                        // ✅ NO warning text about 3 attempts
                       ],
                     ),
                   ),
@@ -252,5 +246,3 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 }
-
-// Register screen import at the bottom to avoid circular reference
