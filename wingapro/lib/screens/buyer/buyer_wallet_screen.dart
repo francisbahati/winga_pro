@@ -1,4 +1,3 @@
-// lib/screens/buyer/buyer_wallet_screen.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -17,12 +16,10 @@ class _BuyerWalletScreenState extends State<BuyerWalletScreen> with SingleTicker
   double _balance = 0;
   bool _loading = true;
 
-  // Deposit
   final _depositAmountController = TextEditingController();
   final _depositMethodController = TextEditingController();
   final List<String> _depositMethods = ['M-Pesa', 'Tigo Pesa', 'Airtel Money', 'Bank Transfer'];
 
-  // Withdraw
   final _withdrawAmountController = TextEditingController();
   final _withdrawPhoneController = TextEditingController();
   String _selectedNetwork = 'M-Pesa';

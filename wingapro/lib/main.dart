@@ -1,13 +1,44 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/welcome_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/buyer/dashboard_screen.dart';
+import 'screens/seller/seller_dashboard_screen.dart';
+import 'screens/admin/admin_dashboard_screen.dart';
 
-void main() {
-  runApp(const WingaProApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('jwt_token');
+  final role = prefs.getString('user_role');
+
+  // Determine initial screen
+  Widget initialScreen;
+  if (token != null && token.isNotEmpty) {
+    // User is logged in – go directly to the appropriate dashboard
+    switch (role) {
+      case 'admin':
+        initialScreen = const AdminDashboardScreen();
+        break;
+      case 'seller':
+        initialScreen = const SellerDashboardScreen();
+        break;
+      default:
+        initialScreen = const DashboardScreen(); // buyer / customer
+        break;
+    }
+  } else {
+    // No token – show welcome/login flow
+    initialScreen = const WelcomeScreen();
+  }
+
+  runApp(WingaProApp(initialScreen: initialScreen));
 }
 
 class WingaProApp extends StatelessWidget {
-  const WingaProApp({super.key});
+  final Widget initialScreen;
+  const WingaProApp({super.key, required this.initialScreen});
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +81,7 @@ class WingaProApp extends StatelessWidget {
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
       ),
-      home: const WelcomeScreen(),
+      home: initialScreen,
     );
   }
 }

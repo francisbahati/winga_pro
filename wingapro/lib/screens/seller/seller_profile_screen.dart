@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:wingapro/services//api_config.dart'; // reuse existing ApiConfig
+import 'package:wingapro/services/api_config.dart';
 
 class SellerProfileScreen extends StatefulWidget {
   const SellerProfileScreen({super.key});
@@ -29,12 +29,12 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('jwt_token');
       if (token == null) throw Exception('Not logged in');
-      final res = await http.get(
+      final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/api/user/profile'),
         headers: {'Authorization': 'Bearer $token'},
       );
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
         setState(() => _user = data['user']);
       } else {
         throw Exception('Failed to load profile');
@@ -49,7 +49,11 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My Profile'), backgroundColor: const Color(0xFF0A2E5C), foregroundColor: Colors.white),
+      appBar: AppBar(
+        title: const Text('My Profile'),
+        backgroundColor: const Color(0xFF0A2E5C),
+        foregroundColor: Colors.white,
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -58,27 +62,34 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            const CircleAvatar(radius: 48, child: Icon(Icons.person, size: 48)),
+            const CircleAvatar(radius: 48, child: Icon(Icons.store, size: 48)),
             const SizedBox(height: 16),
             Card(
               child: ListTile(
-                leading: const Icon(Icons.person),
+                leading: const Icon(Icons.person_outline),
                 title: const Text('Username'),
                 subtitle: Text(_user?['username'] ?? ''),
               ),
             ),
             Card(
               child: ListTile(
-                leading: const Icon(Icons.phone),
+                leading: const Icon(Icons.email_outlined),
+                title: const Text('Email'),
+                subtitle: Text(_user?['email'] ?? ''),
+              ),
+            ),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.phone_outlined),
                 title: const Text('Phone'),
                 subtitle: Text(_user?['phone'] ?? ''),
               ),
             ),
             Card(
               child: ListTile(
-                leading: const Icon(Icons.account_balance_wallet),
+                leading: const Icon(Icons.account_balance_wallet_outlined),
                 title: const Text('Wallet Balance'),
-                subtitle: Text('TZS ${_user?['wallet_balance'] ?? 0}'),
+                subtitle: Text('TZS ${(_user?['wallet_balance'] ?? 0).toStringAsFixed(0)}'),
               ),
             ),
           ],

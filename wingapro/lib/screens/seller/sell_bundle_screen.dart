@@ -20,6 +20,8 @@ class _SellBundleScreenState extends State<SellBundleScreen> {
   late TextEditingController _priceController;
   late TextEditingController _dataSizeController;
   late TextEditingController _validityController;
+  String _selectedNetwork = 'Vodacom';
+  final List<String> _networks = ['Vodacom', 'Mixby', 'Yas', 'Halotel', 'Airtel'];
   bool _isLoading = false;
   bool _isEditing = false;
 
@@ -31,6 +33,9 @@ class _SellBundleScreenState extends State<SellBundleScreen> {
     _priceController = TextEditingController(text: widget.package?['price'] ?? '');
     _dataSizeController = TextEditingController(text: widget.package?['dataSize'] ?? '');
     _validityController = TextEditingController(text: widget.package?['validity'] ?? '');
+    if (widget.package != null && widget.package!['network'] != null) {
+      _selectedNetwork = widget.package!['network'];
+    }
   }
 
   @override
@@ -40,6 +45,41 @@ class _SellBundleScreenState extends State<SellBundleScreen> {
     _dataSizeController.dispose();
     _validityController.dispose();
     super.dispose();
+  }
+
+  String? _validateName(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Package name is required';
+    if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(value)) return 'Only letters and spaces allowed';
+    return null;
+  }
+
+  String? _validatePrice(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Price is required';
+    final numeric = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (numeric.isEmpty) return 'Enter a valid number';
+    return null;
+  }
+
+  String? _validateDataSize(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Data size is required';
+    final lower = value.toLowerCase();
+    if (!lower.contains('mb') && !lower.contains('gb')) {
+      return 'Must include MB or GB (e.g., 500MB, 2GB)';
+    }
+    final numberPart = lower.replaceAll(RegExp(r'[^0-9.]'), '');
+    if (numberPart.isEmpty) return 'Enter a number before unit';
+    return null;
+  }
+
+  String? _validateValidity(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Validity is required';
+    final lower = value.toLowerCase();
+    if (!lower.contains('hour') && !lower.contains('day') && !lower.contains('hr') && !lower.contains('days')) {
+      return 'Must include hours or days (e.g., 24 hours, 7 days)';
+    }
+    final numberPart = lower.replaceAll(RegExp(r'[^0-9.]'), '');
+    if (numberPart.isEmpty) return 'Enter a number before unit';
+    return null;
   }
 
   Future<void> _submit() async {
@@ -56,6 +96,7 @@ class _SellBundleScreenState extends State<SellBundleScreen> {
         'price': _priceController.text.trim(),
         'dataSize': _dataSizeController.text.trim(),
         'validity': _validityController.text.trim(),
+        'network': _selectedNetwork,
       });
 
       http.Response response;
@@ -115,35 +156,51 @@ class _SellBundleScreenState extends State<SellBundleScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Package Name',
                   border: OutlineInputBorder(),
+                  helperText: 'Only letters and spaces',
                 ),
-                validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+                validator: _validateName,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _priceController,
                 decoration: const InputDecoration(
-                  labelText: 'Price (e.g., TZS 1,000)',
+                  labelText: 'Price (e.g., 1000 or 1,000)',
                   border: OutlineInputBorder(),
+                  helperText: 'Numbers only',
                 ),
-                validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+                keyboardType: TextInputType.number,
+                validator: _validatePrice,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _dataSizeController,
                 decoration: const InputDecoration(
-                  labelText: 'Data Size (e.g., 500MB)',
+                  labelText: 'Data Size (e.g., 500MB, 2GB)',
                   border: OutlineInputBorder(),
+                  helperText: 'Include MB or GB',
                 ),
-                validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+                validator: _validateDataSize,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _validityController,
                 decoration: const InputDecoration(
-                  labelText: 'Validity (e.g., 24 hours)',
+                  labelText: 'Validity (e.g., 24 hours, 7 days)',
                   border: OutlineInputBorder(),
+                  helperText: 'Include hours or days',
                 ),
-                validator: (v) => v!.trim().isEmpty ? 'Required' : null,
+                validator: _validateValidity,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _selectedNetwork,
+                items: _networks.map((n) => DropdownMenuItem(value: n, child: Text(n))).toList(),
+                onChanged: (value) => setState(() => _selectedNetwork = value!),
+                decoration: const InputDecoration(
+                  labelText: 'Mobile Network',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.signal_cellular_alt),
+                ),
               ),
               const SizedBox(height: 32),
               _isLoading

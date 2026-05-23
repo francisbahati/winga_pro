@@ -1,4 +1,4 @@
-// lib/screens/seller_dashboard_screen.dart
+// lib/screens/seller/seller_dashboard_screen.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -6,8 +6,10 @@ import 'package:http/http.dart' as http;
 import 'package:wingapro/screens/login_screen.dart';
 import 'package:wingapro/screens/seller/sell_bundle_screen.dart';
 import 'package:wingapro/screens/seller/seller_wallet_screen.dart';
+import 'package:wingapro/screens/seller/seller_orders_screen.dart';
 import 'package:wingapro/services/api_config.dart';
 
+// ==================== INTERNET PACKAGE MODEL ====================
 class InternetPackage {
   final int id;
   final String name;
@@ -55,6 +57,7 @@ class InternetPackage {
   };
 }
 
+// ==================== SELLER DASHBOARD ====================
 class SellerDashboardScreen extends StatefulWidget {
   const SellerDashboardScreen({super.key});
 
@@ -66,7 +69,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
   Map<String, dynamic>? _user;
   List<InternetPackage> _packages = [];
   bool _isLoading = true;
-  int _selectedIndex = 0;
+  int _selectedIndex = 0; // 0: Home, 1: Orders, 2: Wallet, 3: Profile
 
   @override
   void initState() {
@@ -138,7 +141,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
             const SizedBox(height: 8),
             _buildBalanceCard(),
             const SizedBox(height: 24),
-            _buildPackagesSection(),
+            _buildPackagesGrid(),
             const SizedBox(height: 80),
           ],
         ),
@@ -187,178 +190,87 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
     );
   }
 
-  Widget _buildPackagesSection() {
-    final displayPackages = _packages.take(4).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('My Packages', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Text('Swipe →', style: TextStyle(fontSize: 12, color: Colors.grey)),
-            ],
-          ),
+  Widget _buildPackagesGrid() {
+    if (_packages.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(32),
+        child: Center(child: Text('No packages added yet. Tap + to add.')),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.72,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
         ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 220,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: displayPackages.length + 1,
-            itemBuilder: (context, index) {
-              if (index == displayPackages.length) {
-                return _buildMorePackagesCard();
-              }
-              final pkg = displayPackages[index];
-              return _buildPackageCard(pkg);
-            },
-          ),
-        ),
-      ],
+        itemCount: _packages.length,
+        itemBuilder: (context, index) {
+          return _buildPackageCard(_packages[index]);
+        },
+      ),
     );
   }
 
   Widget _buildPackageCard(InternetPackage pkg) {
-    return Container(
-      width: 160,
-      margin: const EdgeInsets.only(right: 16),
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: pkg.color.withOpacity(0.2)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: pkg.color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                  child: Icon(Icons.wifi, size: 20, color: pkg.color),
-                ),
-                const SizedBox(height: 8),
-                Text(pkg.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 2),
-                Text(pkg.dataSize, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                const SizedBox(height: 4),
-                Text(pkg.price, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: pkg.color)),
-                const SizedBox(height: 2),
-                Text(pkg.validity, style: const TextStyle(fontSize: 9, color: Colors.grey)),
-                const Spacer(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 16, color: Colors.blue),
-                      onPressed: () => _editPackage(pkg),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: const Icon(Icons.delete, size: 16, color: Colors.red),
-                      onPressed: () => _deletePackage(pkg.id, pkg.name),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMorePackagesCard() {
-    return GestureDetector(
-      onTap: () => setState(() => _selectedIndex = 1),
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Container(
-        width: 160,
-        margin: const EdgeInsets.only(right: 16),
-        child: Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          child: const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.grid_view, size: 32, color: Color(0xFF0066CC)),
-                SizedBox(height: 8),
-                Text('All\nPackages', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-              ],
-            ),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: pkg.color.withOpacity(0.2)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: pkg.color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                child: Icon(Icons.wifi, size: 24, color: pkg.color),
+              ),
+              const SizedBox(height: 8),
+              Text(pkg.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 4),
+              Text(pkg.dataSize, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              Text(pkg.price, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0066CC))),
+              const SizedBox(height: 4),
+              Text(pkg.validity, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+              const Spacer(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 18, color: Colors.blue),
+                    onPressed: () => _editPackage(pkg),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+                    onPressed: () => _deletePackage(pkg.id, pkg.name),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  // -------------------- PACKAGES TAB (Full Grid) --------------------
-  Widget _buildPackagesPage() {
-    if (_packages.isEmpty) {
-      return const Center(child: Text('No packages added yet'));
-    }
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.75,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
-      itemCount: _packages.length,
-      itemBuilder: (context, index) {
-        final pkg = _packages[index];
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: pkg.color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                  child: Icon(Icons.wifi, size: 24, color: pkg.color),
-                ),
-                const SizedBox(height: 12),
-                Text(pkg.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Text(pkg.dataSize, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                const SizedBox(height: 8),
-                Text(pkg.price, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: pkg.color)),
-                const SizedBox(height: 4),
-                Text(pkg.validity, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                const Spacer(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(icon: const Icon(Icons.edit, size: 18, color: Colors.blue), onPressed: () => _editPackage(pkg)),
-                    IconButton(icon: const Icon(Icons.delete, size: 18, color: Colors.red), onPressed: () => _deletePackage(pkg.id, pkg.name)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  // -------------------- ORDERS TAB --------------------
+  Widget _buildOrdersTab() {
+    return const SellerOrdersScreen();
   }
 
   // -------------------- WALLET TAB --------------------
   Widget _buildWalletTab() {
-    return SellerWalletScreen();
+    return const SellerWalletScreen();
   }
 
   // -------------------- PROFILE TAB --------------------
@@ -437,9 +349,9 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
   Widget _getBodyForIndex(int index) {
     switch (index) {
       case 0: return _buildHomeContent();
-      case 1: return _buildPackagesPage();
-      case 2: return _buildWalletTab();    // Orders removed
-      case 3: return _buildProfileTab();   // Wallet moved to index 2, profile to 3
+      case 1: return _buildOrdersTab();
+      case 2: return _buildWalletTab();
+      case 3: return _buildProfileTab();
       default: return const SizedBox.shrink();
     }
   }
@@ -486,7 +398,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
         labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.shopping_bag_outlined), selectedIcon: Icon(Icons.shopping_bag), label: 'Packages'),
+          NavigationDestination(icon: Icon(Icons.shopping_cart_outlined), selectedIcon: Icon(Icons.shopping_cart), label: 'Orders'),
           NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
         ],
