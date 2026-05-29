@@ -11,23 +11,64 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ---------- Database Connection ----------
-const sequelize = new Sequelize(
-  process.env.DB_NAME,
-  process.env.DB_USER,
-  process.env.DB_PASSWORD,
-  {
-    host: process.env.DB_HOST,
+// ---------- Database Connection (supports Railway internal + external proxy) ----------
+let sequelize;
+
+// 1. If Railway provides MYSQL_URL (internal or external), use it first
+if (process.env.MYSQL_URL) {
+  sequelize = new Sequelize(process.env.MYSQL_URL, {
     dialect: 'mysql',
     logging: false,
-  }
-);
+    dialectOptions: {
+      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      connectTimeout: 60000
+    }
+  });
+}
+// 2. If explicit external proxy URL is provided (recommended for your setup)
+else if (process.env.EXTERNAL_MYSQL_URL) {
+  sequelize = new Sequelize(process.env.EXTERNAL_MYSQL_URL, {
+    dialect: 'mysql',
+    logging: false,
+    dialectOptions: {
+      ssl: { rejectUnauthorized: false },   // required for external proxy
+      connectTimeout: 60000
+    }
+  });
+}
+// 3. Fallback to individual Railway variables (MYSQLHOST, etc.)
+else if (process.env.MYSQLHOST) {
+  sequelize = new Sequelize(
+    process.env.MYSQLDATABASE,
+    process.env.MYSQLUSER,
+    process.env.MYSQLPASSWORD,
+    {
+      host: process.env.MYSQLHOST,
+      port: process.env.MYSQLPORT || 3306,
+      dialect: 'mysql',
+      logging: false,
+      dialectOptions: {
+        connectTimeout: 60000
+      }
+    }
+  );
+}
+// 4. Direct hardcoded external proxy (using your credentials) – only as last resort
+else {
+  console.log('⚠️ Using hardcoded external proxy (zephyr.proxy.rlwy.net:46065)');
+  sequelize = new Sequelize('wingapro_db', 'root', 'kvhvfgfnDfrCnziRdjjVoSoTcoAQmbOK', {
+    host: 'zephyr.proxy.rlwy.net',
+    port: 46065,
+    dialect: 'mysql',
+    logging: false,
+    dialectOptions: {
+      ssl: { rejectUnauthorized: false },   // mandatory for external proxy
+      connectTimeout: 60000
+    }
+  });
+}
 
-sequelize.authenticate()
-  .then(() => console.log('✅ Database connected'))
-  .catch((err) => console.error('❌ Database connection error:', err));
-
-// ---------- User Model (with is_active) ----------
+// ---------- Models ----------
 const User = sequelize.define('User', {
   username: { type: DataTypes.STRING, unique: true, allowNull: false },
   email: { type: DataTypes.STRING, unique: true, allowNull: false },
@@ -38,7 +79,6 @@ const User = sequelize.define('User', {
   is_active: { type: DataTypes.BOOLEAN, defaultValue: true, allowNull: false }
 });
 
-// ---------- Package Model ----------
 const Package = sequelize.define('Package', {
   name: { type: DataTypes.STRING, allowNull: false },
   price: { type: DataTypes.STRING, allowNull: false },
@@ -48,7 +88,6 @@ const Package = sequelize.define('Package', {
   is_active: { type: DataTypes.BOOLEAN, defaultValue: true, allowNull: false }
 }, { timestamps: true });
 
-// ---------- Transaction Model (with recipient fields) ----------
 const Transaction = sequelize.define('Transaction', {
   buyer_id: { type: DataTypes.INTEGER, allowNull: false, references: { model: User, key: 'id' } },
   seller_id: { type: DataTypes.INTEGER, allowNull: false, references: { model: User, key: 'id' } },
@@ -67,7 +106,7 @@ Transaction.belongsTo(User, { as: 'buyer', foreignKey: 'buyer_id' });
 Transaction.belongsTo(User, { as: 'seller', foreignKey: 'seller_id' });
 Transaction.belongsTo(Package, { as: 'package', foreignKey: 'package_id' });
 Package.hasMany(Transaction, { foreignKey: 'package_id' });
-Package.belongsTo(User, { as: 'seller', foreignKey: 'createdBy' }); // for public packages
+Package.belongsTo(User, { as: 'seller', foreignKey: 'createdBy' });
 
 // ---------- Middleware ----------
 function authenticateToken(req, res, next) {
@@ -452,7 +491,6 @@ app.get('/api/admin/transactions', authenticateToken, isAdmin, async (req, res) 
   }
 });
 
-// Admin can delete any package (bypassing seller check)
 app.delete('/api/admin/packages/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
     const deleted = await Package.destroy({ where: { id: req.params.id } });
@@ -463,15 +501,27 @@ app.delete('/api/admin/packages/:id', authenticateToken, isAdmin, async (req, re
   }
 });
 
-// ---------- Start Server ----------
+// ---------- Start Server with Retry Logic ----------
 const PORT = process.env.PORT || 5000;
-sequelize.sync({ alter: true })
-  .then(() => {
-    app.listen(PORT, () => {
+
+const startServer = async () => {
+  try {
+    await sequelize.authenticate();
+    console.log('✅ Database connected');
+    
+    // 🔥 FORCE TABLE CREATION: alter: true creates missing tables and updates schema
+    await sequelize.sync({ alter: true });
+    console.log('📦 Database synced (tables created/updated)');
+    
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📡 API available at http://localhost:${PORT}`);
+      console.log(`📡 API available at http://0.0.0.0:${PORT}`);
     });
-  })
-  .catch((err) => {
-    console.error('❌ Failed to sync database:', err);
-  });
+  } catch (error) {
+    console.error('❌ Database connection error:', error.message);
+    console.log('Retrying in 5 seconds...');
+    setTimeout(startServer, 5000);
+  }
+};
+
+startServer();
