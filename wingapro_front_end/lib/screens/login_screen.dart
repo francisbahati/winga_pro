@@ -1,26 +1,23 @@
 // lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';  // for kDebugMode
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-// ✅ Import the shared TokenService
-import 'package:wingapro/services/token_service.dart';  // adjust path if needed
-import '../widgets/custom_button.dart';
+import 'package:wingapro/services/token_service.dart';
+import 'register_screen.dart';
+import 'forgot_password_screen.dart';
 import 'buyer/dashboard_screen.dart';
 import 'seller/seller_dashboard_screen.dart';
 import 'admin/admin_dashboard_screen.dart';
-import 'register_screen.dart';
 import 'package:wingapro/services/api_config.dart';
 
-/// Secure auth service using the shared TokenService for JWT token
+// Auth service (same as before, no changes)
 class AuthService {
-  final TokenService _tokenService = TokenService();  // ✅ use shared service
+  final TokenService _tokenService = TokenService();
   final _prefs = SharedPreferencesAsync();
 
   Future<Map<String, dynamic>> login(String username, String password) async {
-    // Sanitize inputs
     final sanitizedUsername = username.trim().toLowerCase();
     if (sanitizedUsername.isEmpty || password.isEmpty) {
       throw Exception('Username/email/phone and password are required');
@@ -46,7 +43,6 @@ class AuthService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['token'] != null) {
-          // ✅ use TokenService to store token
           await _tokenService.setToken(data['token']);
           await _prefs.setString('user_role', data['user']['role']);
           return data;
@@ -71,18 +67,15 @@ class AuthService {
   }
 
   Future<void> logout() async {
-    // ✅ use TokenService to delete token
     await _tokenService.deleteToken();
     await _prefs.remove('user_role');
   }
 
   Future<String?> getToken() async {
-    // ✅ use TokenService to read token
     return await _tokenService.getToken();
   }
 }
 
-// ---- Everything below this line is UNCHANGED ----
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -102,11 +95,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _checkAndClearInvalidToken();
-  }
-
-  Future<void> _checkAndClearInvalidToken() async {
-    // Optional: clear token if you want to force login every time
   }
 
   Future<void> _handleLogin() async {
@@ -159,22 +147,10 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _handleForgotPassword() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Password Reset'),
-        content: const Text(
-          'why do you forget your pasword\n'
-              'contact me immediately 0621215286.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+  void _navigateToForgotPassword() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
     );
   }
 
@@ -212,9 +188,9 @@ class _LoginScreenState extends State<LoginScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
               child: Card(
-                elevation: 8,
+                elevation: 12,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(32),
                 ),
                 color: Colors.white,
                 child: Padding(
@@ -225,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Logo & Title
+                        // Logo + Title
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -242,14 +218,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             const Text(
                               'WINGA PRO',
                               style: TextStyle(
-                                fontSize: 28,
+                                fontSize: 32,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF0A2E5C),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 40),
 
                         // Network error banner
                         if (_isNetworkError)
@@ -258,7 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: Colors.red.shade200),
                             ),
                             child: Row(
@@ -275,16 +251,20 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
 
-                        // Username / Email / Phone field
+                        // Username / Email / Phone
                         TextFormField(
                           controller: _identifierController,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
                           autocorrect: false,
                           enableSuggestions: false,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Email or Phone Number',
-                            prefixIcon: Icon(Icons.person_outline),
+                            prefixIcon: const Icon(Icons.person_outline),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
@@ -298,7 +278,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 20),
 
-                        // Password field
+                        // Password
                         TextFormField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
@@ -310,49 +290,69 @@ class _LoginScreenState extends State<LoginScreen> {
                               icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
                               onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                             ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your password';
                             }
-                            if (value.length < 4) {
-                              return 'Password too short';
+                            if (value.length < 6) {
+                              return 'Password must be at least 6 characters';
                             }
                             return null;
                           },
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
 
                         // Forgot password
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed: _handleForgotPassword,
+                            onPressed: _navigateToForgotPassword,
                             style: TextButton.styleFrom(foregroundColor: const Color(0xFF1E88E5)),
-                            child: const Text('Forgot password?'),
+                            child: const Text('Forgot password?', style: TextStyle(fontWeight: FontWeight.w600)),
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 32),
 
-                        // Login button
+                        // --- LOGIN BUTTON (same size as outlined button) ---
                         _isLoading
                             ? const Center(child: CircularProgressIndicator())
-                            : CustomButton(
-                          label: 'Login',
+                            : ElevatedButton(
                           onPressed: _handleLogin,
-                          isGradient: true,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0A2E5C),
+                            minimumSize: const Size(double.infinity, 52),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            elevation: 2,
+                          ),
+                          child: const Text(
+                            'Login',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
 
-                        // Register button
+                        // --- CREATE NEW ACCOUNT BUTTON (same size) ---
                         OutlinedButton(
                           onPressed: _navigateToRegister,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF0A2E5C),
-                            side: const BorderSide(color: Color(0xFF0A2E5C)),
-                            minimumSize: const Size(double.infinity, 50),
+                            side: const BorderSide(color: Color(0xFF0A2E5C), width: 1.5),
+                            minimumSize: const Size(double.infinity, 52),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
                           ),
-                          child: const Text('Create New Account'),
+                          child: const Text(
+                            'Create New Account',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          ),
                         ),
                       ],
                     ),
